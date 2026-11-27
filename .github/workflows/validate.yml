@@ -51,7 +51,7 @@ jobs:
           EXPECTED_DIGEST: ${{ needs.verify.outputs.digest }}
         run: |
           set -euo pipefail
-          tag="v0.1.0-rc.1"
+          tag="v0.1.0-rc.2"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "A draft or release already exists; leaving it unchanged."
             exit 1
@@ -59,4 +59,4 @@ jobs:
           bash test/package.sh
           sha256sum switchyard.zip switchyard-yandex.zip | tee SHA256SUMS
           test "$(sha256sum SHA256SUMS | cut -d ' ' -f1)" = "$EXPECTED_DIGEST"
-          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --latest=false --title "Стрелочная · 0.1.0 RC1" --notes "Source: $GITHUB_SHA. CI: $GITHUB_RUN_ID. Yandex draft and moderation not run." switchyard.zip switchyard-yandex.zip SHA256SUMS
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --latest=false --title "Стрелочная · 0.1.0 RC2" --notes "Source: $GITHUB_SHA. CI: $GITHUB_RUN_ID. Yandex draft and moderation not run." switchyard.zip switchyard-yandex.zip SHA256SUMS

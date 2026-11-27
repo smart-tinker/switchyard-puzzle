@@ -26,3 +26,19 @@ export function dispatch(level, run) {
   const index = run.index + 1;
   return { ...run, actual, index, state: index === level.order.length ? 'win' : 'play' };
 }
+
+export function dailyLevel(date) {
+  const day=date.toISOString().slice(0,10), order=[];
+  let seed=Math.imul(Date.parse(day)/86400000,2654435761)>>>0;
+  for(let i=0;i<8;i++) {
+    seed^=seed<<13; seed^=seed>>>17; seed^=seed<<5;
+    const choices=routes.filter(r=>r!==order.at(-1));
+    order.push(choices[(seed>>>0)%choices.length]);
+  }
+  // Both configurations for track A are considered when setting the budget.
+  const paths=['C','B','A','A'];
+  let costs=[0,Infinity,Infinity,Infinity];
+  for(const route of order) costs=paths.map((p,to)=>p!==route?Infinity:
+    Math.min(...costs.map((c,from)=>c+((from^to)&1)+(((from^to)>>1)&1))));
+  return {name:'Смена дня',day,order,budget:Math.min(...costs)+2};
+}

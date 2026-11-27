@@ -2,7 +2,22 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { dailyLevel, destination, dispatch, newRun, toggle } from '../game/yard.mjs';
 
+function solve(level,state,seen=new Set()) {
+  if(state.state==='win') return [];
+  if(state.state!=='play') return null;
+  const key=[state.index,state.moves,...state.switches].join(',');
+  if(seen.has(key)) return null;
+  seen.add(key);
+  const actions=[['s1',toggle(state,0)],['s2',toggle(state,1)]];
+  if(destination(state.switches)===level.order[state.index]) actions.unshift(['send',dispatch(level,state)]);
+  for(const [id,next] of actions){
+    const rest=solve(level,next,seen);
+    if(rest) return [id,...rest];
+  }
+  return null;
+}
 const files = { '/':'index.html','/yard.css':'yard.css','/app.mjs':'app.mjs','/yard.mjs':'yard.mjs' };
 const mock = `
   window.calls=[]; window.events={};
@@ -67,6 +82,30 @@ try {
   await offline.locator('#send').click();
   await offline.getByRole('button',{name:'Следующий уровень'}).waitFor();
   assert.deepEqual(errors,[]);
+  const day=new Date('2026-11-27T12:00:00Z');
+  await offline.clock.setFixedTime(day);
+  await offline.locator('#daily').click();
+  assert.match(await offline.locator('#level').textContent(),/2026-11-27/);
+  assert.equal(await offline.locator('#record').textContent(),'Рекорда пока нет');
+  const l=dailyLevel(day), solution=solve(l,newRun(l));
+  assert.ok(solution);
+  for(const [i,id] of solution.entries()){
+    await offline.locator('#'+id).click();
+    if(id==='send' && i<solution.length-1) await offline.waitForFunction(()=>!document.querySelector('#send').disabled);
+  }
+  await offline.getByRole('button',{name:'Сыграть ещё раз'}).waitFor();
+  const record='Рекорд дня: '+solution.filter(x=>x!=='send').length+' перев.';
+  assert.equal(await offline.locator('#record').textContent(),record);
+  await offline.reload();
+  await offline.locator('#daily').click();
+  assert.equal(await offline.locator('#record').textContent(),record);
+  await offline.locator('#campaign').click();
+  assert.match(await offline.locator('#level').textContent(),/01/);
+  await offline.clock.setFixedTime(new Date('2026-11-28T12:00:00Z'));
+  await offline.locator('#daily').click();
+  assert.equal(await offline.locator('#record').textContent(),'Рекорда пока нет');
+  assert.deepEqual(errors,[]);
+  console.log('DAILY_REPLAY_PASS');
   console.log('PORTABLE_SMOKE_PASS');
   console.log('DESKTOP_AND_MOBILE_SMOKE_PASS');
 } finally {

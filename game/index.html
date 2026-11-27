@@ -12,6 +12,11 @@
 <body>
 <main>
   <header><h1>Стрелочная</h1><p id="level"></p></header>
+  <div class="modes" role="group" aria-label="Режим игры">
+    <button id="campaign" type="button" aria-pressed="true">Уровни</button>
+    <button id="daily" type="button" aria-pressed="false">Смена дня</button>
+    <p id="record" hidden></p>
+  </div>
   <p class="intro">Переведите стрелки и отправьте составы на свои пути.</p>
   <section class="board" aria-label="Схема путей">
     <svg viewBox="0 0 920 350" aria-hidden="true">

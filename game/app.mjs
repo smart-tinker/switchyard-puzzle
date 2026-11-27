@@ -1,4 +1,4 @@
-import {destination, dispatch, levels, newRun, toggle} from './yard.mjs';
+import {dailyLevel, destination, dispatch, levels, newRun, toggle} from './yard.mjs';
 
 const $ = (id) => document.getElementById(id);
 const svg = (tag) => document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -30,13 +30,13 @@ for (const d of trackParts) {
   gap.setAttribute('stroke-width','5');
   $('rails').append(gap);
 }
-const key = 'switchyard.progress.v1';
+const key = 'switchyard.progress.v1', recordKey = 'switchyard.daily.v1';
 let levelIndex = 0;
 try {
   const saved=Number(localStorage.getItem(key));
   if (Number.isInteger(saved) && saved>=0 && saved<levels.length) levelIndex=saved;
 } catch {}
-let level=levels[levelIndex], run=newRun(level), moving=false, paused=false, adPending=false;
+let level=levels[levelIndex], run=newRun(level), moving=false, paused=false, adPending=false, daily=false;
 let sdk, activeSdk=false, lastAdAt=performance.now(), engaged=false;
 const buttons=[$('s1'),$('s2')];
 const blocked=()=>paused || document.hidden || adPending;
@@ -50,7 +50,15 @@ function gameplay() {
 }
 function render() {
   const route=destination(run.switches), target=level.order[run.index];
-  $('level').textContent='Уровень '+String(levelIndex+1).padStart(2,'0')+' / 08';
+  $('level').textContent=daily?'Смена '+level.day+' (UTC)':'Уровень '+String(levelIndex+1).padStart(2,'0')+' / 08';
+  $('campaign').setAttribute('aria-pressed',String(!daily));
+  $('daily').setAttribute('aria-pressed',String(daily));
+  $('campaign').disabled=$('daily').disabled=blocked() || moving;
+  $('record').hidden=!daily;
+  if(daily){
+    const best=readRecord();
+    $('record').textContent=best===null?'Рекорда пока нет':'Рекорд дня: '+best+' перев.';
+  }
   $('selected').setAttribute('d',track[route]);
   if (!moving) {
     $('train').style.color=colors[target ?? run.actual ?? 'B'];
@@ -63,10 +71,10 @@ function render() {
   $('reset').disabled=blocked() || moving;
   $('send').disabled=blocked() || moving;
   const end=levelIndex===levels.length-1;
-  $('send').textContent=run.state==='miss'?'Повторить':run.state==='win'?(end?'Сыграть заново':'Следующий уровень'):'Отправить состав';
+  $('send').textContent=run.state==='miss'?'Повторить':run.state==='win'?(daily?'Сыграть ещё раз':end?'Сыграть заново':'Следующий уровень'):'Отправить состав';
   $('status').textContent=blocked()?'Пауза':run.state==='miss'?
     'Не тот путь: '+run.actual+' вместо '+target+'. Попробуйте ещё раз.':
-    run.state==='win'?(end?'Смена завершена. Все составы на своих путях!':'Все составы на месте. Уровень пройден.'):
+    run.state==='win'?(daily?'Смена пройдена за '+run.moves+' перев.':end?'Смена завершена. Все составы на своих путях!':'Все составы на месте. Уровень пройден.'):
     level.name+' · Переводов осталось: '+(level.budget-run.moves)+' · Состав '+target+' → выбран путь '+route;
   $('queue').replaceChildren(...level.order.map((a,i)=>{
     const li=document.createElement('li');
@@ -79,6 +87,25 @@ function render() {
 }
 function change(n) { if(!blocked()&&!moving){engaged=true;run=toggle(run,n);render()} }
 function restart() { if(!blocked()&&!moving){engaged=true;run=newRun(level);render()} }
+function readRecord() {
+  try {
+    const r=JSON.parse(localStorage.getItem(recordKey));
+    if(r?.day===level.day && Number.isInteger(r.moves) && r.moves>=0 && r.moves<=level.budget) return r.moves;
+  } catch {}
+  return null;
+}
+function saveRecord() {
+  const best=readRecord();
+  if(best!==null && best<=run.moves) return;
+  try { localStorage.setItem(recordKey,JSON.stringify({day:level.day,moves:run.moves})); } catch {}
+}
+function setMode(value) {
+  if(blocked() || moving || daily===value) return;
+  daily=value;
+  level=daily?dailyLevel(new Date()):levels[levelIndex];
+  run=newRun(level);
+  render();
+}
 function next() {
   levelIndex=(levelIndex+1)%levels.length;
   try { localStorage.setItem(key,String(levelIndex)); } catch {}
@@ -93,7 +120,7 @@ function advance() {
 function send() {
   if (blocked() || moving) return;
   if (run.state==='miss') { restart(); return; }
-  if (run.state==='win') { advance(); return; }
+  if (run.state==='win') { if(daily) restart(); else advance(); return; }
   engaged=true; moving=true; render();
   const path=$('selected'), len=path.getTotalLength();
   let last=performance.now(), elapsed=0;
@@ -105,10 +132,12 @@ function send() {
     const point=path.getPointAtLength(83+(len-83)*pct);
     $('train').setAttribute('transform','translate('+point.x+' '+point.y+')');
     if(pct<1) requestAnimationFrame(frame);
-    else { run=dispatch(level,run); moving=false; render(); }
+    else { run=dispatch(level,run); if(daily && run.state==='win') saveRecord(); moving=false; render(); }
   });
 }
 buttons.forEach((b,i)=>b.addEventListener('click',()=>change(i)));
+$('campaign').addEventListener('click',()=>setMode(false));
+$('daily').addEventListener('click',()=>setMode(true));
 $('reset').addEventListener('click',restart);
 $('send').addEventListener('click',send);
 document.addEventListener('keydown',(e)=>{

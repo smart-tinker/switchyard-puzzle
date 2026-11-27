@@ -33,6 +33,7 @@ try {
   const status=page.locator('#status');
   await page.waitForFunction(()=>window.calls?.includes('ready'));
   assert.match(await status.textContent(),/Первый рейс/);
+  console.log('YARD_DESKTOP_JPEG='+ (await page.screenshot({type:'jpeg',quality:35})).toString('base64'));
   await page.keyboard.press('Space');
   await page.getByRole('button',{name:'Повторить'}).waitFor();
   assert.match(await status.textContent(),/C вместо A/);
@@ -53,6 +54,7 @@ try {
   await phone.goto(url);
   assert.equal(await phone.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await phone.getByRole('button',{name:'Стрелка 1',exact:true}).tap();
+  console.log('YARD_MOBILE_JPEG='+ (await phone.screenshot({type:'jpeg',quality:32})).toString('base64'));
   await phone.getByRole('button',{name:'Отправить состав'}).tap();
   await phone.getByRole('button',{name:'Следующий уровень'}).waitFor();
   assert.deepEqual(errors,[]);

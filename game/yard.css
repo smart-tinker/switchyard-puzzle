@@ -24,3 +24,5 @@ button:disabled{opacity:.62;cursor:default}button:focus-visible{outline:3px soli
 .actions{display:flex;gap:8px}.actions #send{background:linear-gradient(#ffcf83,var(--gold));color:#1b1409;border-color:#ffe0a1}
 .keys{color:var(--muted);font-size:.75rem;margin:10px 0 0}
 @media(max-width:520px){main{width:calc(100% - 20px);padding-top:18px}.actions{width:100%}.actions #send{flex:1}.keys{display:none}}
+
+button{-webkit-tap-highlight-color:transparent}

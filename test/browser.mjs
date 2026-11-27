@@ -15,11 +15,12 @@ const mock = `
 `;
 const srv = createServer(async(req,res)=>{
   if(req.url==='/sdk.js'){res.setHeader('Content-Type','text/javascript');res.end(mock);return}
-  const file=files[req.url];
+  const plain=req.url.startsWith('/portable/');
+  const file=files[plain?req.url.slice('/portable'.length):req.url];
   if(!file){res.writeHead(404).end();return}
   try{
     res.setHeader('Content-Type',file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.css')?'text/css':'text/javascript');
-    res.end(await readFile('packed/'+file));
+    res.end(await readFile((plain?'portable/':'packed/')+file));
   }catch{res.writeHead(500).end()}
 });
 await new Promise(resolve=>srv.listen(0,'127.0.0.1',resolve));
@@ -58,6 +59,15 @@ try {
   await phone.getByRole('button',{name:'Отправить состав'}).tap();
   await phone.getByRole('button',{name:'Следующий уровень'}).waitFor();
   assert.deepEqual(errors,[]);
+  const offline=await browser.newPage({reducedMotion:'reduce'});
+  offline.on('pageerror',e=>errors.push(e.message));
+  await offline.goto(url+'/portable/');
+  assert.equal(await offline.locator('script[src="/sdk.js"]').count(),0);
+  await offline.keyboard.press('1');
+  await offline.locator('#send').click();
+  await offline.getByRole('button',{name:'Следующий уровень'}).waitFor();
+  assert.deepEqual(errors,[]);
+  console.log('PORTABLE_SMOKE_PASS');
   console.log('DESKTOP_AND_MOBILE_SMOKE_PASS');
 } finally {
   await browser?.close();

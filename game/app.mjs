@@ -67,7 +67,7 @@ function render() {
   $('status').textContent=blocked()?'Пауза':run.state==='miss'?
     'Не тот путь: '+run.actual+' вместо '+target+'. Попробуйте ещё раз.':
     run.state==='win'?(end?'Смена завершена. Все составы на своих путях!':'Все составы на месте. Уровень пройден.'):
-    level.name+' · Стрелок осталось: '+(level.budget-run.moves)+' · Состав '+target+' → выбран путь '+route;
+    level.name+' · Переводов осталось: '+(level.budget-run.moves)+' · Состав '+target+' → выбран путь '+route;
   $('queue').replaceChildren(...level.order.map((a,i)=>{
     const li=document.createElement('li');
     li.textContent=a; li.style.backgroundColor=colors[a];
@@ -130,4 +130,4 @@ async function connect() {
   } catch (err) { console.warn('Yandex Games SDK unavailable:',err?.message); }
 }
 if(globalThis.YaGames) void connect();
-else document.querySelector('script[src="/sdk.js"]').addEventListener('load',connect,{once:true});
+else document.querySelector('script[src="/sdk.js"]')?.addEventListener('load',connect,{once:true});

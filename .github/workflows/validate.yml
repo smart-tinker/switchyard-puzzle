@@ -2,26 +2,61 @@ name: Validate
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, feat/pilot]
 permissions:
   contents: read
 jobs:
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    outputs:
+      digest: ${{ steps.package.outputs.digest }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - run: node --test test/yard.test.mjs
       - name: Package exact source and validate ZIP
+        id: package
         run: |
-          (cd game && zip -q ../switchyard.zip index.html app.mjs yard.mjs yard.css)
-          unzip -t switchyard.zip
-          test "$(unzip -Z1 switchyard.zip | head -n1)" = index.html
-          sha256sum switchyard.zip
-          unzip -q switchyard.zip -d packed
+          bash test/package.sh
+          for file in switchyard.zip switchyard-yandex.zip; do
+            unzip -t "$file"
+            test "$(unzip -Z1 "$file" | head -n1)" = index.html
+          done
+          sha256sum switchyard.zip switchyard-yandex.zip | tee SHA256SUMS
+          echo "digest=$(sha256sum SHA256SUMS | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          unzip -q switchyard-yandex.zip -d packed
+          unzip -q switchyard.zip -d portable
       - name: Install pinned browser harness
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx --no-install playwright install --with-deps chromium
       - name: Verify desktop and mobile from exact ZIP
         run: node test/browser.mjs
+  draft:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/pilot'
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Create the unpublished, source-pinned ZIP draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_DIGEST: ${{ needs.verify.outputs.digest }}
+        run: |
+          set -euo pipefail
+          tag="v0.1.0-rc.1"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A draft or release already exists; leaving it unchanged."
+            exit 1
+          fi
+          bash test/package.sh
+          sha256sum switchyard.zip switchyard-yandex.zip | tee SHA256SUMS
+          test "$(sha256sum SHA256SUMS | cut -d ' ' -f1)" = "$EXPECTED_DIGEST"
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --latest=false --title "Стрелочная · 0.1.0 RC1" --notes "Source: $GITHUB_SHA. CI: $GITHUB_RUN_ID. Yandex draft and moderation not run." switchyard.zip switchyard-yandex.zip SHA256SUMS

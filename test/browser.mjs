@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { dailyLevel, destination, dispatch, newRun, toggle } from '../game/yard.mjs';
 
@@ -17,6 +18,49 @@ function solve(level,state,seen=new Set()) {
     if(rest) return [id,...rest];
   }
   return null;
+}
+const promo=process.env.PROMO_DIR;
+if(promo) await mkdir(promo,{recursive:true});
+async function shot(page,name,w=1280,h=720) {
+  if(!promo) return;
+  const bytes=await page.screenshot({path:join(promo,name+'.png'),animations:'disabled'});
+  assert.equal(bytes.subarray(1,4).toString(),'PNG');
+  assert.equal(bytes.readUInt32BE(16),w);
+  assert.equal(bytes.readUInt32BE(20),h);
+}
+async function artwork(page,icon) {
+  const w=icon?1024:1920, h=icon?1024:1080;
+  await page.setViewportSize({width:w,height:h});
+  const scenery=`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <defs>
+    <radialGradient id="night"><stop stop-color="#24435c"/><stop offset="1" stop-color="#0a1423"/></radialGradient>
+    <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M0 50V0H50" fill="none" stroke="#476481" stroke-opacity=".4" stroke-width="2"/></pattern>
+    <path id="rail" d="M-180 660H250C395 660 405 377 555 377H1290 M250 660H1290"/>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#night)"/>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+  <g transform="translate(${icon?0:950} ${icon?0:50})">
+    <use href="#rail" fill="none" stroke="#7193ae" stroke-width="64" stroke-dasharray="9 32"/>
+    <use href="#rail" fill="none" stroke="#0d2638" stroke-width="36"/>
+    <use href="#rail" fill="none" stroke="#b0cada" stroke-width="20"/>
+    <use href="#rail" fill="none" stroke="#203a50" stroke-width="11"/>
+    <path d="M-180 660H250C395 660 405 377 555 377H1290" fill="none" stroke="#62dfc2" stroke-width="6"/>
+    <circle cx="250" cy="660" r="24" fill="#ffbf63" stroke="#111c29" stroke-width="8"/>
+    <g transform="translate(455 662)" stroke="#102032" stroke-width="10" fill="#ffbf63">
+      <rect x="0" y="-169" width="200" height="143" rx="31"/>
+      <rect x="23" y="-248" width="126" height="101" rx="18"/>
+      <rect x="41" y="-224" width="60" height="53" rx="10" fill="#173348"/>
+      <rect x="175" y="-131" width="196" height="103" rx="26"/>
+      <rect x="308" y="-176" width="32" height="50" rx="7"/>
+      <circle cx="56" cy="-11" r="29"/><circle cx="141" cy="-11" r="29"/><circle cx="298" cy="-11" r="29"/>
+    </g>
+  </g>
+  ${icon?'':`<text x="108" y="531" fill="#ffbf63" font-family="system-ui,sans-serif" font-weight="900" font-size="149" letter-spacing="-7">Стрелочная</text>
+  <path d="M117 594H870" stroke="#62dfc2" stroke-width="7"/>
+  <circle cx="117" cy="594" r="11" fill="#62dfc2"/>`}
+  </svg>`;
+  await page.setContent('<!doctype html><html lang="ru"><meta charset="utf-8"><style>body{margin:0}svg{display:block}</style>'+scenery+'</html>');
+  await shot(page,icon?'01-icon':'02-cover',w,h);
 }
 const files = { '/':'index.html','/yard.css':'yard.css','/app.mjs':'app.mjs','/yard.mjs':'yard.mjs' };
 const mock = `
@@ -74,14 +118,24 @@ try {
   await phone.getByRole('button',{name:'Отправить состав'}).tap();
   await phone.getByRole('button',{name:'Следующий уровень'}).waitFor();
   assert.deepEqual(errors,[]);
-  const offline=await browser.newPage({reducedMotion:'reduce'});
+  const offline=await browser.newPage({viewport:{width:1280,height:720},reducedMotion:'reduce'});
   offline.on('pageerror',e=>errors.push(e.message));
   await offline.goto(url+'/portable/');
   assert.equal(await offline.locator('script[src="/sdk.js"]').count(),0);
+  if(promo) {
+    const controls=await offline.locator('.actions').boundingBox();
+    assert.ok(controls && controls.y+controls.height<=720);
+  }
+  await shot(offline,'03-campaign');
   await offline.keyboard.press('1');
   await offline.locator('#send').click();
   await offline.getByRole('button',{name:'Следующий уровень'}).waitFor();
   assert.deepEqual(errors,[]);
+  if(promo) {
+    await offline.getByRole('button',{name:'Следующий уровень'}).click();
+    await offline.locator('#s2').click();
+    await shot(offline,'04-track-switch');
+  }
   const day=new Date('2026-11-27T12:00:00Z');
   await offline.clock.setFixedTime(day);
   await offline.locator('#daily').click();
@@ -92,15 +146,17 @@ try {
   for(const [i,id] of solution.entries()){
     await offline.locator('#'+id).click();
     if(id==='send' && i<solution.length-1) await offline.waitForFunction(()=>!document.querySelector('#send').disabled);
+    if(id==='send' && i===solution.indexOf('send')) await shot(offline,'05-daily-in-progress');
   }
   await offline.getByRole('button',{name:'Сыграть ещё раз'}).waitFor();
+  await shot(offline,'06-daily-record');
   const record='Рекорд дня: '+solution.filter(x=>x!=='send').length+' перев.';
   assert.equal(await offline.locator('#record').textContent(),record);
   await offline.reload();
   await offline.locator('#daily').click();
   assert.equal(await offline.locator('#record').textContent(),record);
   await offline.locator('#campaign').click();
-  assert.match(await offline.locator('#level').textContent(),/01/);
+  assert.match(await offline.locator('#level').textContent(),promo?/02/:/01/);
   await offline.clock.setFixedTime(new Date('2026-11-28T12:00:00Z'));
   await offline.locator('#daily').click();
   assert.equal(await offline.locator('#record').textContent(),'Рекорда пока нет');
@@ -108,6 +164,12 @@ try {
   console.log('DAILY_REPLAY_PASS');
   console.log('PORTABLE_SMOKE_PASS');
   console.log('DESKTOP_AND_MOBILE_SMOKE_PASS');
+  if(promo) {
+    const art=await browser.newPage();
+    await artwork(art,true);
+    await artwork(art,false);
+    console.log('PROMO_SIX_PNG_PASS');
+  }
 } finally {
   await browser?.close();
   srv.close();

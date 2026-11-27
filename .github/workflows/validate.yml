@@ -38,25 +38,40 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/feat/pilot'
     needs: verify
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 12
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-      - name: Create the unpublished, source-pinned ZIP draft
+      - name: Install pinned browser harness for the promo bundle
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps chromium
+      - name: Generate and validate promo media
         env:
-          GH_TOKEN: ${{ github.token }}
           EXPECTED_DIGEST: ${{ needs.verify.outputs.digest }}
         run: |
           set -euo pipefail
-          tag="v0.1.0-rc.2"
+          bash test/package.sh
+          sha256sum switchyard.zip switchyard-yandex.zip | tee SHA256SUMS
+          test "$(sha256sum SHA256SUMS | cut -d ' ' -f1)" = "$EXPECTED_DIGEST"
+          unzip -q switchyard-yandex.zip -d packed
+          unzip -q switchyard.zip -d portable
+          PROMO_DIR=promo node test/browser.mjs
+          test "$(find promo -maxdepth 1 -type f -name '*.png' | wc -l)" -eq 6
+          (cd promo && zip -q ../switchyard-promo.zip *.png)
+          unzip -t switchyard-promo.zip
+          sha256sum switchyard-promo.zip >> SHA256SUMS
+      - name: Create the unpublished, source-pinned ZIP draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="v0.1.0-rc.3"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "A draft or release already exists; leaving it unchanged."
             exit 1
           fi
-          bash test/package.sh
-          sha256sum switchyard.zip switchyard-yandex.zip | tee SHA256SUMS
-          test "$(sha256sum SHA256SUMS | cut -d ' ' -f1)" = "$EXPECTED_DIGEST"
-          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --latest=false --title "Стрелочная · 0.1.0 RC2" --notes "Source: $GITHUB_SHA. CI: $GITHUB_RUN_ID. Yandex draft and moderation not run." switchyard.zip switchyard-yandex.zip SHA256SUMS
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --latest=false --title "Стрелочная · 0.1.0 RC3" --notes "Source: $GITHUB_SHA. CI: $GITHUB_RUN_ID. No platform submission or moderation performed." switchyard.zip switchyard-yandex.zip switchyard-promo.zip SHA256SUMS

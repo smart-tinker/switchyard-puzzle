@@ -1,0 +1,27 @@
+name: Validate
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: node --test test/yard.test.mjs
+      - name: Package exact source and validate ZIP
+        run: |
+          (cd game && zip -q ../switchyard.zip index.html app.mjs yard.mjs yard.css)
+          unzip -t switchyard.zip
+          test "$(unzip -Z1 switchyard.zip | head -n1)" = index.html
+          sha256sum switchyard.zip
+          unzip -q switchyard.zip -d packed
+      - name: Install pinned browser harness
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps chromium
+      - name: Verify desktop and mobile from exact ZIP
+        run: node test/browser.mjs

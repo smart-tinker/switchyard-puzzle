@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Стрелочная</title>
+  <link rel="stylesheet" href="./yard.css">
+  <script async src="/sdk.js"></script>
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+<main>
+  <header><h1>Стрелочная</h1><p id="level"></p></header>
+  <p class="intro">Переведите стрелки и отправьте составы на свои пути.</p>
+  <section class="board" aria-label="Схема путей">
+    <svg viewBox="0 0 920 350" aria-hidden="true">
+      <g id="rails"></g>
+      <path id="selected" />
+      <path class="guide" d="M277 165V240 M528 165V240" />
+      <circle class="pivot" cx="277" cy="165" r="9" /><circle class="pivot" cx="528" cy="165" r="9" />
+      <text class="rail-label" x="36" y="132">ВХОД</text>
+      <g class="markers">
+        <rect x="842" y="42" width="48" height="48" rx="8" fill="#ffbf63"/><text x="866" y="67">A</text>
+        <rect x="842" y="141" width="48" height="48" rx="8" fill="#62dfc2"/><text x="866" y="166">B</text>
+        <rect x="842" y="237" width="48" height="48" rx="8" fill="#ca97ff"/><text x="866" y="262">C</text>
+      </g>
+      <g id="train" transform="translate(105 165)">
+        <rect x="-25" y="-13" width="24" height="19" rx="4" fill="currentColor"/>
+        <rect x="-22" y="-25" width="17" height="18" rx="3" fill="currentColor"/>
+        <rect x="-19" y="-21" width="7" height="7" rx="1" fill="#102438"/>
+        <rect x="-5" y="-7" width="28" height="13" rx="4" fill="currentColor"/>
+        <circle cx="-17" cy="11" r="4" fill="currentColor"/><circle cx="-3" cy="11" r="4" fill="currentColor"/><circle cx="16" cy="11" r="4" fill="currentColor"/>
+      </g>
+    </svg>
+    <button id="s1" class="switch one" type="button" aria-label="Стрелка 1" aria-pressed="false"><span></span>1</button>
+    <button id="s2" class="switch two" type="button" aria-label="Стрелка 2" aria-pressed="false"><span></span>2</button>
+  </section>
+  <p id="status" role="status"></p>
+  <div class="panel">
+    <section class="queue" aria-labelledby="queue-title"><h2 id="queue-title">Следующие составы</h2><ol id="queue"></ol></section>
+    <div class="actions"><button id="reset" type="button">Сброс</button><button id="send" type="button">Отправить состав</button></div>
+  </div>
+  <p class="keys">Клавиши: 1 и 2 — стрелки; пробел — отправить состав.</p>
+</main>
+</body>
+</html>

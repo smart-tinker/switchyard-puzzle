@@ -1,0 +1,66 @@
+name: RC3 private promo proof
+on:
+  push:
+    branches: [qa/rc3-promo-review]
+    paths: ['.github/workflows/rc3-promo-proof.yml']
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Fetch and authenticate the exact draft asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/460810197" --jq '.draft and .target_commitish == "5e40281e39556be802b48ebcc94b37909782c1c8"' | grep -Fx true
+          gh api -H 'Accept: application/octet-stream' "repos/$GITHUB_REPOSITORY/releases/assets/801113205" > promo.zip
+          echo '0bf8c3b9f173a1434067e5fcf2128fa811545092b57e3bee69ac797606254d02  promo.zip' | sha256sum -c
+      - name: Trace six previews from the verified ZIP
+        run: |
+          set -euo pipefail
+          if ! /usr/bin/python3 -c 'from PIL import Image'; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends python3-pil
+          fi
+          /usr/bin/python3 - <<'PY'
+          from io import BytesIO
+          from zipfile import ZipFile
+          from PIL import Image, ImageDraw
+          data = [
+            ('01-icon.png',(1024,1024)),('02-cover.png',(1920,1080)),
+            ('03-campaign.png',(1280,720)),('04-track-switch.png',(1280,720)),
+            ('05-daily-in-progress.png',(1280,720)),('06-daily-record.png',(1280,720)),
+          ]
+          with ZipFile('promo.zip') as z:
+              assert sorted(z.namelist()) == sorted(n for n, _ in data)
+              for row in range(3):
+                  sheet = Image.new('RGB',(1080,410),'#09131e')
+                  label = ImageDraw.Draw(sheet)
+                  for col,(name,size) in enumerate(data[row*2:row*2+2]):
+                      im = Image.open(BytesIO(z.read(name)))
+                      assert im.format == 'PNG' and im.size == size
+                      im = im.convert('RGB')
+                      im.thumbnail((520,365),Image.Resampling.LANCZOS)
+                      sheet.paste(im,(col*540+(540-im.width)//2,10))
+                      label.text((col*540+12,389),name,fill='#ffffff')
+                  sheet.save(f'proof-{row}.jpg',quality=74,optimize=True)
+          PY
+      - name: Seal the reviewer copy without publishing artwork
+        run: |
+          set -euo pipefail
+          {
+            printf '%s\n' '-----BEGIN CERTIFICATE-----'
+            printf '%s\n' 'MIIEITCCAomgAwIBAgIURsIKyO9l+epdhcnLAQa8wRyMfdgwDQYJKoZIhvcNAQELBQAwIDEeMBwGA1UEAwwVc3dpdGNoeWFyZC1yYzMtdmlzdWFsMB4XDTI2MTEyNzE2MTczM1oXDTI2MTEyOTE2MTczM1owIDEeMBwGA1UEAwwVc3dpdGNoeWFyZC1yYzMtdmlzdWFsMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAxWIlZ6bYamn9eHusy4YjOWmpdMMtGM343W/wj8oDH9wQo0d6llwJWJF9UjcbaT1RacJaC6fa5z8EsUd11yXBgLnjxdfROzniQSrdgr/GUXg0ItQcbH5tTxg/hmFA2JX3e6G8ZCyGXsSXofAtOiDtxQWeWT8gBS4IAdKPH4qSXIKz39ZVkHEfLvPWZvKAa5X/1aUxY1ntGlOBV7PdTK2JLzlhPMTrkyCQqHM70FG2Kyhcw2gdtkfE0JeCnkKZDl+O5zwwj1lad4AhNxNwOp/73fwTqkmXIeKz6hLrEyZp0cVuKMfEIRTKq9XCalCtbtHxk1S4o0EL77aQqkth07dDU+xddD8Y+P6WyW7qCoAXOj9M0boUHuMsSE6HmDjKDpTnDojpLAf9FL2tS6+rSfTSO/kMNPK9smSVes2J7HgYnctcQ4V2BLg05dtGeBtYbw7m+DxUf8bD7D/OIUaV57rDuvXLPlYxMrpNasIkfwG41vdQG3OBmPcxGpnh30k/j9uPAgMBAAGjUzBRMB0GA1UdDgQWBBTGnP7ZSlntf5yFWWiZT7NmH1XuJzAfBgNVHSMEGDAWgBTGnP7ZSlntf5yFWWiZT7NmH1XuJzAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBgQBBXflxr3i2c2sxWeejUSHUKzlMJeMU0MuDGAK8eJO41KkUZ4xOTPCkP40wa3+MevMHHaVagvU/xt53EICmwlHX6UsisO9YLEtdoTTUeJy5DUavhRqCxtXR6A9PvFQ67ue+/CBv2wQDpAO4Ot1u9RE1RNWLkTdt2TbOdnTWUDK/nUsBPSLqecRSpqa0zIZbFNhd8wIr6NdTK+TRn+DVF67v26rfOF0ROp4nifuHS/BC+IeuBhn0Nt3/XNy0Qo7lX5ehxKdohClDMYpa5LXIZ8MzfhmdbM1djfs8mvL4BzQ0rFq4jy+Y7E1usXEaVKFAlnrs0byyjq8BPzWxeDLW8bQMbEbBH6Irmvjd77qNHDfVJSo0pobnba3kq2nBM+JGo5IConuiC1vWr1SrFPv305Mi9CgEIJ/u1g6lQ92by9F0rY6yylPIhaAo+Tt1S+UVgB5L6a0yRm5RLslfPQRJ0e3wYIFJGYMi9W61nh77kN75JNauTdx2ELJ/jb2FlnN/FtA=' | fold -w64
+            printf '%s\n' '-----END CERTIFICATE-----'
+          } > review.crt
+          openssl x509 -in review.crt -noout
+          for n in 0 1 2; do
+            openssl cms -encrypt -binary -aes-256-cbc -in "proof-$n.jpg" -outform DER -out "proof-$n.cms" review.crt
+            echo "SWITCH_REVIEW_$n BEGIN"
+            base64 -w160 "proof-$n.cms"
+            printf '\n'
+            echo "SWITCH_REVIEW_$n END"
+          done

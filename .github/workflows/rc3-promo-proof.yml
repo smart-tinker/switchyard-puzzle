@@ -10,15 +10,23 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 6
     steps:
-      - name: Fetch and authenticate the exact draft asset
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 5e40281e39556be802b48ebcc94b37909782c1c8
+          persist-credentials: false
+      - name: Regenerate previews from the exact verified game
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/releases/460810197" --jq '.draft and .target_commitish == "5e40281e39556be802b48ebcc94b37909782c1c8"' | grep -Fx true
-          gh api -H 'Accept: application/octet-stream' "repos/$GITHUB_REPOSITORY/releases/assets/801113205" > promo.zip
-          echo '0bf8c3b9f173a1434067e5fcf2128fa811545092b57e3bee69ac797606254d02  promo.zip' | sha256sum -c
-      - name: Trace six previews from the verified ZIP
+          test "$(git rev-parse HEAD)" = 5e40281e39556be802b48ebcc94b37909782c1c8
+          bash test/package.sh
+          echo 'e34f7ff221f8177a0a44d3b7b174a63d17113089cc888eb46c5697d456b0407f  switchyard.zip' | sha256sum -c
+          unzip -q switchyard-yandex.zip -d packed
+          unzip -q switchyard.zip -d portable
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx --no-install playwright install --with-deps chromium
+          PROMO_DIR=promo node test/browser.mjs | grep -E '^(DAILY_REPLAY|PORTABLE_SMOKE|DESKTOP_AND_MOBILE_SMOKE|PROMO_SIX_PNG)_PASS$'
+          (cd promo && zip -q ../promo.zip *.png)
+      - name: Trace six previews from the regenerated PNGs
         run: |
           set -euo pipefail
           if ! /usr/bin/python3 -c 'from PIL import Image'; then

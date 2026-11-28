@@ -67,6 +67,14 @@ function render() {
     const best=readRecord();
     $('record').textContent=best===null?'Рекорда пока нет':'Рекорд дня: '+best+' перев.';
   }
+  const trainingTarget=training && run.state==='play' ? target : '';
+  $('training-target').hidden=!trainingTarget;
+  $('training-target').textContent=trainingTarget ? 'Активный состав: '+trainingTarget+' · Целевой путь: '+trainingTarget : '';
+  $('train-label').textContent=trainingTarget;
+  $('train-badge').classList.toggle('visible',Boolean(trainingTarget));
+  for(const rail of ['A','B','C']){
+    $('marker-'+rail).classList.toggle('target',rail===trainingTarget);
+  }
   $('selected').setAttribute('d',track[route]);
   if (!moving) {
     $('train').style.color=colors[target ?? run.actual ?? 'B'];

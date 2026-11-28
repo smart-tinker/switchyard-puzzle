@@ -23,6 +23,7 @@
     <button id="order-ac" type="button" aria-pressed="false">Сначала A, потом C</button>
   </div>
   <p class="intro">Переведите стрелки и отправьте составы на свои пути.</p>
+  <p id="training-target" hidden></p>
   <section class="board" aria-label="Схема путей">
     <svg viewBox="0 0 920 350" aria-hidden="true">
       <g id="rails"></g>
@@ -31,9 +32,9 @@
       <circle class="pivot" cx="277" cy="165" r="9" /><circle class="pivot" cx="528" cy="165" r="9" />
       <text class="rail-label" x="36" y="132">ВХОД</text>
       <g class="markers">
-        <rect x="842" y="42" width="48" height="48" rx="8" fill="#ffbf63"/><text x="866" y="67">A</text>
-        <rect x="842" y="141" width="48" height="48" rx="8" fill="#62dfc2"/><text x="866" y="166">B</text>
-        <rect x="842" y="237" width="48" height="48" rx="8" fill="#ca97ff"/><text x="866" y="262">C</text>
+        <rect id="marker-A" x="842" y="42" width="48" height="48" rx="8" fill="#ffbf63"/><text x="866" y="67">A</text>
+        <rect id="marker-B" x="842" y="141" width="48" height="48" rx="8" fill="#62dfc2"/><text x="866" y="166">B</text>
+        <rect id="marker-C" x="842" y="237" width="48" height="48" rx="8" fill="#ca97ff"/><text x="866" y="262">C</text>
       </g>
       <g id="train" transform="translate(105 165)">
         <rect x="-25" y="-13" width="24" height="19" rx="4" fill="currentColor"/>
@@ -41,6 +42,7 @@
         <rect x="-19" y="-21" width="7" height="7" rx="1" fill="#102438"/>
         <rect x="-5" y="-7" width="28" height="13" rx="4" fill="currentColor"/>
         <circle cx="-17" cy="11" r="4" fill="currentColor"/><circle cx="-3" cy="11" r="4" fill="currentColor"/><circle cx="16" cy="11" r="4" fill="currentColor"/>
+        <g id="train-badge"><circle cx="38" cy="-8" r="20"/><text id="train-label" x="38" y="-8"></text></g>
       </g>
     </svg>
     <button id="s1" class="switch one" type="button" aria-label="Стрелка 1" aria-pressed="false"><span></span>1</button>

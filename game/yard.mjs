@@ -6,6 +6,9 @@ const layouts = [
   ['Вечерняя смена', 'CABABCA', 7], ['Чистая смена', 'ACBABCBA', 8],
 ];
 export const levels = layouts.map(([name, order, budget]) => ({ name, order: [...order], budget }));
+export function trainingLevel(aFirst=false) {
+  return {name:'Учебная смена',order:aFirst?['A','C']:['C','A'],budget:1};
+}
 export const destination = ([top, middle]) => top ? 'A' : middle ? 'B' : 'C';
 
 export function newRun(level) {

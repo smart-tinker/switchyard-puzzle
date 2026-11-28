@@ -109,6 +109,25 @@ try {
   await page.reload();
   assert.match(await page.locator('#level').textContent(),/02/);
   assert.deepEqual(errors,[]);
+  async function checkTrainingTarget(p,letter){
+    const clue=p.locator('#training-target');
+    assert.equal(await clue.isVisible(),true);
+    assert.equal(await clue.textContent(),'Активный состав: '+letter+' · Целевой путь: '+letter);
+    assert.equal(await p.locator('#train-label').textContent(),letter);
+    assert.equal(await p.locator('#train-badge').isVisible(),true);
+    assert.deepEqual(await p.locator('.markers .target').evaluateAll(nodes=>nodes.map(n=>n.id)),['marker-'+letter]);
+    assert.equal(await p.locator('#marker-'+letter).evaluate(n=>getComputedStyle(n).strokeDasharray),'9px, 5px');
+  }
+  assert.equal(await page.locator('#training-target').isVisible(),false);
+  await page.locator('#training').focus();
+  await page.keyboard.press('Enter');
+  await checkTrainingTarget(page,'C');
+  await page.locator('#order-ca').focus();
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(()=>document.activeElement.id),'order-ac');
+  await page.keyboard.press('Enter');
+  await checkTrainingTarget(page,'A');
+  assert.match(await status.textContent(),/выбран путь C/);
   const phone=await browser.newPage({viewport:{width:360,height:640},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
   phone.on('pageerror',e=>errors.push(e.message));
   await phone.goto(url);
@@ -118,6 +137,12 @@ try {
   await phone.getByRole('button',{name:'Отправить состав'}).tap();
   await phone.getByRole('button',{name:'Следующий уровень'}).waitFor();
   assert.deepEqual(errors,[]);
+  await phone.locator('#training').tap();
+  await checkTrainingTarget(phone,'C');
+  await phone.locator('#order-ac').tap();
+  await checkTrainingTarget(phone,'A');
+  assert.match(await phone.locator('#status').textContent(),/выбран путь C/);
+  assert.equal(await phone.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   const offline=await browser.newPage({viewport:{width:1280,height:720},reducedMotion:'reduce'});
   offline.on('pageerror',e=>errors.push(e.message));
   await offline.goto(url+'/portable/');
@@ -143,10 +168,13 @@ try {
   assert.match(await offline.locator('#status').textContent(),/Переводов осталось: 1.*выбран путь C/);
   await offline.locator('#send').click();
   await offline.waitForFunction(()=>document.querySelector('#queue .next')?.textContent==='A');
+  await checkTrainingTarget(offline,'A');
   await offline.locator('#s1').click();
   await offline.locator('#send').click();
   await offline.getByRole('button',{name:'Сыграть ещё раз'}).waitFor();
   assert.match(await offline.locator('#status').textContent(),/Учебная смена пройдена за один перевод/);
+  assert.equal(await offline.locator('#training-target').isVisible(),false);
+  assert.equal(await offline.locator('.markers .target').count(),0);
   await offline.locator('#order-ac').click();
   assert.deepEqual(await offline.locator('#queue li').allTextContents(),['A','C']);
   await offline.locator('#s1').click();
@@ -160,6 +188,7 @@ try {
   await offline.locator('#reset').click();
   assert.deepEqual(await offline.locator('#queue li').allTextContents(),['A','C']);
   assert.equal(await offline.locator('#queue .done').count(),0);
+  await checkTrainingTarget(offline,'A');
   assert.match(await offline.locator('#status').textContent(),/Переводов осталось: 1.*выбран путь C/);
   await offline.locator('#campaign').click();
   assert.equal(await offline.locator('#training-order').isVisible(),false);

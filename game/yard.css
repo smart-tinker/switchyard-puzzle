@@ -31,3 +31,5 @@ button{-webkit-tap-highlight-color:transparent}
 .modes button[aria-pressed=true]{border-color:var(--gold);color:var(--gold)}
 #record{margin:0;color:var(--muted);font-size:.87rem}
 @media(min-width:800px) and (max-height:760px){main{width:min(100% - 32px,940px);padding-top:20px}}
+
+#training-order[hidden]{display:none}
